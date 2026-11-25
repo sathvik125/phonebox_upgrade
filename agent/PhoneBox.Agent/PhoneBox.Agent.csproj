@@ -22,6 +22,8 @@
     <OutputType>WinExe</OutputType>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationIcon>phonebox.ico</ApplicationIcon>
+    <!-- WindowCapture and H264Encoder read native buffers in place -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup Condition="$(TargetFramework.Contains('-windows'))">

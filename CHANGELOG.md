@@ -8,6 +8,19 @@
   [Vasilispapg](https://github.com/Vasilispapg)).
 
 **Widgets**
+- Now playing: with **Show the video when tapped** on in the widget's options, tapping the cover or the title shows
+  the playing app's window full screen on the phone, live (Windows 10 1903 or later). The agent captures only that
+  window with Windows Graphics Capture, even behind other windows, and for a browser (Brave, Chrome, Edge, …) only the
+  tab's page, without its tabs and toolbar: in YouTube's theater or full screen mode that is the video alone. It is
+  encoded with Windows' own H.264 encoder at up to 960 px wide and 30 frames a second; nothing else needs installing.
+  The phone decodes it in hardware (WebCodecs, WebView 94 or later) and draws each picture as it comes, so it stays
+  with the sound, which keeps playing on the computer; the app reads the stream itself, as the WebView would hand it
+  over in 64 KB bursts. Tap or Back closes it, and the capture stops with it, also when the panel goes out of sight.
+  The picture fits the phone's screen (never bigger than the window on the computer), and the ⚙ button in the video
+  view picks a resolution (Auto, 720p, 1080p, 1440p or the window's own size, up to 4K) and a quality (Standard,
+  High or Max: 1x, 2x or 3x the bitrate), kept on each phone.
+  Off by default; Windows draws a frame around the window while it is captured. Tried on a vivo 1606 (Android 6,
+  WebView 95) over USB: about 27 frames a second at 960 x 548, no stalls, 16 ms median decode time.
 - Trackpad: move, click and scroll the computer's mouse from the phone, with tap to click, two fingers to right-click
   and scroll, hold to drag and an optional edge scroll bar. Mouse control is off until you turn on **Allow controlling
   the mouse from the phone** in the widget's options; Windows, and Linux with `xdotool` under X11 (#250, #251,
@@ -22,6 +35,11 @@
   (#259, [ajaybali9](https://github.com/ajaybali9)).
 
 **Panel**
+- Widgets scale on WebViews older than Chromium 105 too (Android 5, and Android 6 phones stuck on WebView 95 such as
+  a vivo 1606): their text, padding and dials used to fall back to the browser's default sizes, so labels came out
+  large and subtitles were cut off. `cq-compat.js` stands in for container queries there, and the outdated WebView
+  notice no longer shows. Checked against Chromium's own container queries on every demo widget, in landscape and
+  portrait: the same sizes.
 - Pomodoro: the Vietnamese example for your own sequence uses the words the timer understands (`25 focus, 5 break`);
   copied as shown, the translated words were not understood.
 - Clock widget: a new option chooses which AI quota providers its status line shows; clocks saved before it show

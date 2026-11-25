@@ -350,6 +350,62 @@
   const DEMO_CONSOLE = { id: 'photoshop', label: 'Photoshop', keys: ['Brush', 'Eraser', 'Undo', 'Redo', 'Zoom in', 'Zoom out', 'Fit', 'Save'],
     dial: { left: true, right: true, press: true } };
   const json = (o, status = 200, headers = {}) => new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', ...headers } });
+  // ScreenFeed's messages: 4-byte big-endian length, a type (1 setup, 2 key frame, 3 frame), frames with a µs timestamp
+  const screenMessage = (type, payload, timeUs = 0) => {
+    const video = type !== 1, out = new Uint8Array(5 + (video ? 8 : 0) + payload.length), v = new DataView(out.buffer);
+    v.setUint32(0, out.length - 4);
+    out[4] = type;
+    if (video) v.setBigInt64(5, BigInt(Math.round(timeUs)));
+    out.set(payload, video ? 13 : 5);
+    return out;
+  };
+  // like H264Encoder.Shape: SVC units (NAL 14 and 20, which Edge's encoder adds) out, a phone's decoder shows green on them
+  const withoutSvc = (au) => {
+    const starts = [];
+    for (let i = 0; i + 2 < au.length; i++) if (au[i] === 0 && au[i + 1] === 0 && au[i + 2] === 1) { starts.push(i + 3); i += 2; }
+    if (!starts.some((s) => (au[s] & 31) === 14 || (au[s] & 31) === 20)) return au;
+    const parts = [];
+    starts.forEach((s, k) => {
+      let end = k + 1 < starts.length ? starts[k + 1] - 3 : au.length;
+      if (k + 1 < starts.length && au[end - 1] === 0) end--;
+      if ((au[s] & 31) !== 14 && (au[s] & 31) !== 20) parts.push(new Uint8Array([0, 0, 0, 1]), au.subarray(s, end));
+    });
+    const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+    let at = 0; for (const p of parts) { out.set(p, at); at += p.length; }
+    return out;
+  };
+  const demoScreenStream = () => {
+    const W = 960, H = 540, codec = 'avc1.42E01F'; // ScreenFeed.MaxWidth, at 16:9
+    const canvas = new OffscreenCanvas(W, H), g = canvas.getContext('2d');
+    let timer = 0, encoder = null, n = 0, announced = false;
+    return new ReadableStream({
+      start(out) {
+        encoder = new VideoEncoder({
+          output: (chunk) => {
+            if (!announced) { out.enqueue(screenMessage(1, new TextEncoder().encode(JSON.stringify({ codec, width: W, height: H })))); announced = true; }
+            const data = new Uint8Array(chunk.byteLength);
+            chunk.copyTo(data);
+            out.enqueue(screenMessage(chunk.type === 'key' ? 2 : 3, withoutSvc(data), chunk.timestamp));
+          },
+          // some browsers decode H.264 but can't encode it (Android WebView 95): the stream just ends
+          error: () => { clearInterval(timer); try { out.close(); } catch (_) {} },
+        });
+        encoder.configure({ codec, width: W, height: H, bitrate: 2_500_000, framerate: 30, latencyMode: 'realtime', avc: { format: 'annexb' } });
+        timer = setInterval(() => {
+          if (encoder.state !== 'configured') { clearInterval(timer); return; }
+          const t = performance.now(), x = (t / 4) % W;
+          g.fillStyle = '#0b1020'; g.fillRect(0, 0, W, H);
+          g.fillStyle = '#f59e0b'; g.fillRect(x - 45, 210, 90, 90);
+          g.fillStyle = '#fff'; g.font = 'bold 72px monospace'; g.fillText(new Date().toISOString().slice(11, 22), 60, 480);
+          g.font = '30px monospace'; g.fillText('PhoneBox demo · the computer\'s video plays here', 60, 75);
+          const frame = new VideoFrame(canvas, { timestamp: Math.round(t * 1000) });
+          encoder.encode(frame, { keyFrame: n++ % 30 === 0 }); // a key frame a second, like ScreenFeed
+          frame.close();
+        }, 1000 / 30);
+      },
+      cancel() { clearInterval(timer); try { encoder?.close(); } catch (_) {} },
+    });
+  };
   const parse = (body) => { if (body == null || body === '') return null; try { return JSON.parse(body); } catch (_) { return String(body); } };
 
   // Control Deck preview data only. Native integrations live in the desktop agent.
@@ -617,6 +673,14 @@
       const d = new Date(), x = (d.getTime() / 25) % 640;
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360"><rect width="640" height="360" fill="#1f2937"/><rect y="250" width="640" height="110" fill="#374151"/><rect x="${x.toFixed(0)}" y="0" width="6" height="360" fill="#22d3ee" opacity=".5"/><text x="16" y="34" fill="#fff" font-family="monospace" font-size="22">CAM 1  ${d.toTimeString().slice(0, 8)}</text></svg>`;
       return new Response(svg, { status: 200, headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-store' } });
+    }
+    // Now playing's full-screen video: like ScreenFeed, only for a Now playing widget with "Show the video when tapped"
+    // on, and in the same messages; the demo "window" is a moving picture encoded with the browser's own H.264 encoder
+    if (path === '/api/screen') {
+      const w = panelWidget(await config(), q.get('widget'), 'media');
+      if (w?.options?.video !== true) return json({ state: 'off' }, 403);
+      if (typeof VideoEncoder !== 'function' || typeof OffscreenCanvas !== 'function') return json({ state: 'unsupported' }, 501);
+      return new Response(demoScreenStream(), { status: 200, headers: { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store' } });
     }
     if (path === '/api/dictate' && method === 'POST') {
       if (panelWidget(await config(), q.get('widget'), 'dictate')?.options?.control !== true)

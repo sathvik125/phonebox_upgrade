@@ -34,7 +34,8 @@ import javax.net.ssl.X509TrustManager
  */
 class AgentLink(private val context: Context) {
 
-    class Reply(val code: Int, val contentType: String?, val body: InputStream)
+    /** [connection] lets a long-lived stream be cut off at once (closing [body] can wait to drain what is left). */
+    class Reply(val code: Int, val contentType: String?, val body: InputStream, val connection: HttpURLConnection? = null)
 
     enum class Route { USB, WIFI, NONE }
 
@@ -290,7 +291,7 @@ class AgentLink(private val context: Context) {
             return Reply(502, "application/json", ByteArrayInputStream("""{"error":"unexpected response"}""".toByteArray()))
         }
         val body = (if (code >= 400) c.errorStream else c.inputStream) ?: ByteArrayInputStream(ByteArray(0))
-        return Reply(code, c.contentType, body)
+        return Reply(code, c.contentType, body, c)
     }
 
     /** While on USB, refresh the Wi-Fi pairing data about once a minute. */

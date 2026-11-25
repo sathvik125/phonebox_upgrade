@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="controls.css">
 <link rel="stylesheet" href="appearance.css">
+<script src="cq-compat.js"></script>
 </head>
 <body>
 <!-- Pages and widgets are built by main.js and widgets/*.js from the layout designed in the agent's settings page. -->
@@ -88,6 +89,8 @@
       return;
     }
     if (window.CSS && typeof CSS.supports === 'function' && CSS.supports('font-size', '1cqw')) return;
+    // cq-compat.js stands in for container queries, so the widgets scale anyway
+    if (window.__pbCqCompat) return;
     try { if (sessionStorage.getItem('pb-wv-dismissed') === '1') return; } catch (_) {}
     el.hidden = false; el.style.display = 'flex';
     if (btn) btn.onclick = function (e) {
