@@ -23,14 +23,11 @@ PC stats, AI coding sessions, music and touch controls over USB or Wi-Fi.<br>
 Windows, Linux and macOS. No root, PhoneBox account or cloud service required.</p>
 
 <p align="center">
-  <a href="https://ersinkoc.github.io/phonebox/"><b>Try the live demo</b></a> ·
-  <a href="https://github.com/ersinkoc/phonebox/releases/latest"><b>Download</b></a> ·
+  <a href="#my-additions"><b>My additions</b></a> ·
   <a href="#quick-start"><b>Quick start</b></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/ersinkoc/phonebox/actions/workflows/build.yml"><img src="https://github.com/ersinkoc/phonebox/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
-  <a href="https://github.com/ersinkoc/phonebox/releases/latest"><img src="https://img.shields.io/github/v/release/ersinkoc/phonebox?label=release" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/Windows%20%C2%B7%20Linux%20%C2%B7%20macOS-.NET%2010-512bd4" alt="Windows, Linux, macOS; .NET 10">
   <img src="https://img.shields.io/badge/Android-5%2B-3ddc84" alt="Android 5+">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -42,6 +39,56 @@ Windows, Linux and macOS. No root, PhoneBox account or cloud service required.</
 PhoneBox pairs a full-screen **Android app** with a small **desktop agent**. Build your panel in a browser-based
 visual editor: **124 widgets**, **30 templates**, multiple pages and a live preview. Connect several phones with
 their own layouts, or switch one phone between paired computers.
+
+## My additions
+
+This repository is my own version of PhoneBox. It is based on the open-source PhoneBox project by Ersin Koç
+(MIT license, see [LICENSE](LICENSE)), and adds the features below on top of it.
+
+### Support for older Android versions
+
+Phones and tablets with an older Android System WebView (before Chromium 105, for example stock Android 6 and 7
+devices) do not understand CSS container queries, so widget cards showed with the wrong sizes, overlapping text or
+cut-off content. [cq-compat.js](android/app/src/main/assets/www/cq-compat.js) adds a fallback for these WebViews:
+
+- it rewrites the panel's container-query units (`cqw`, `cqh`, `cqmin`, `cqmax`) and `@container` rules into plain
+  CSS that every WebView understands;
+- it measures each card with a `ResizeObserver` and keeps its size up to date as pages, widgets and layouts change;
+- newer WebViews are left alone and use the native container queries.
+
+Tested on a vivo 1606 (Android 6). To force the fallback on a newer device for testing, open the panel with `?cqcompat`.
+
+### Video streaming for Now playing
+
+Tap the **Now playing** card to watch the video that is playing on the computer, full screen and live, for example a
+YouTube tab in the browser. The sound keeps playing on the computer.
+
+- **Turn it on:** in the settings, edit the Now playing widget and enable **Show the video when tapped**.
+- **Close it:** tap the video or press Back.
+- **Settings on the device (⚙):** resolution (Auto = the device's screen, 720p, 1080p, 1440p or the original size up
+  to 4K) and quality (Standard, High or Max, 1×–3× bitrate). Each phone or tablet remembers its own choice.
+
+How it works: the agent captures only the playing window (Windows Graphics Capture), crops it to the page area,
+encodes it with the computer's H.264 encoder (Media Foundation) and streams it on `/api/screen`. The phone decodes it
+with its hardware decoder (WebCodecs) and draws each frame as soon as it is ready. The Android app reads the stream
+natively ([ScreenStream.kt](android/app/src/main/java/net/oxog/phonebox/deskpanel/ScreenStream.kt)), so frames are not
+delivered in bursts.
+
+Requirements and limits:
+
+- **Windows only** for now ([ScreenFeed.cs](agent/PhoneBox.Agent/ScreenFeed.cs)).
+- The player window must not be minimized; Windows does not draw minimized windows.
+- Chromium browsers (Chrome, Edge, Brave) stop drawing a window that is fully covered by another one. Start the
+  browser with `--disable-features=CalculateNativeWinOcclusion` to keep it drawing in the background.
+- USB gives the smoothest picture. Over Wi-Fi, use **Auto** and **Standard** for the lowest delay.
+- One viewer at a time.
+
+### Installing this version
+
+This version has no published releases. Build the agent and the APK from source (see
+[development commands](docs/DEVELOPMENT.md#development)) and install them yourself. In the agent's settings, under
+**Updates**, turn off **Install new releases automatically**: an update installs the original PhoneBox release, which
+does not have these features.
 
 ## What you can do
 
@@ -67,38 +114,26 @@ works without either. Release agents include .NET, so you do not need to install
 
 ### 1. Install the desktop agent
 
-**Windows 10/11 x64** — paste into a normal PowerShell window:
+Build the agent from this repository (see [development commands](docs/DEVELOPMENT.md#development)) and run it.
+It opens the settings at <http://127.0.0.1:8765>. See [Installing this version](#installing-this-version).
 
-```powershell
-irm https://raw.githubusercontent.com/ersinkoc/phonebox/main/setup.ps1 | iex
-```
+> **Windows:** self-built agents are unsigned, so SmartScreen, Smart App Control or antivirus software may warn or
+> block them. See the [installation warnings](docs/SETUP.md#quick-start). USB debugging should be authorized only on
+> computers you trust.
 
-**Linux or macOS** — run as your own user:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/ersinkoc/phonebox/main/setup.sh | bash
-```
-
-Setup downloads the latest release, checks its SHA-256 checksum, offers missing dependencies and start-at-login,
-and opens the settings at <http://127.0.0.1:8765>. It can also install the Android app over USB.
-Run setup again to update or repair the installation while keeping settings and pairings.
-
-> **Windows signing:** release agents are currently unsigned while the SignPath Foundation application is pending.
-> SmartScreen or antivirus software may warn or block them. See the [code signing policy](#code-signing-policy)
-> and [installation warnings](docs/SETUP.md#quick-start). USB debugging should be authorized only on computers you trust.
-
-Read the scripts before running them: [Windows](setup.ps1) · [Linux/macOS](setup.sh).
 The [installation guide](docs/SETUP.md) covers options, dependencies, install paths, troubleshooting and uninstalling.
+Its setup scripts ([Windows](setup.ps1) · [Linux/macOS](setup.sh)) install the original PhoneBox release, without the
+additions above.
 
 ### 2. Connect the phone
 
 | USB | Wi-Fi only |
 |---|---|
-| Enable **Developer options → USB debugging**, connect a data cable and accept the phone's authorization prompt. Let setup install the app, or use **Settings → General → Install the phone app**. | Install the APK from the [latest release](https://github.com/ersinkoc/phonebox/releases/latest). Wi-Fi is off by default: open the settings page (tray icon, or `http://127.0.0.1:8765`), turn on **General → Wi-Fi & Tailscale → Let the phone connect without the USB cable**, click **Save**, then **Restart to apply** at the top. Choose **Pair a phone over Wi-Fi**, scan the pairing QR code and confirm the matching check code. |
+| Enable **Developer options → USB debugging**, connect a data cable and accept the phone's authorization prompt. Install the APK you built with `adb install -r`. | Install the APK you built on the phone. Wi-Fi is off by default: open the settings page (tray icon, or `http://127.0.0.1:8765`), turn on **General → Wi-Fi & Tailscale → Let the phone connect without the USB cable**, click **Save**, then **Restart to apply** at the top. Choose **Pair a phone over Wi-Fi**, scan the pairing QR code and confirm the matching check code. |
 | Wakes and opens the panel on connection; supports app updates over adb. | No adb or developer options needed; install app updates manually unless you later configure USB. |
 
-The phone app is not in any app store; it comes only from this repository's releases. It runs on Android 5.0 and
-newer; there is no iOS version.
+The phone app is not in any app store; build it from this repository. It runs on Android 5.0 and newer; there is
+no iOS version.
 
 For automatic USB/Wi-Fi fallback, enable Wi-Fi and connect the phone over USB once.
 [Connection details and Tailscale setup →](docs/SETUP.md#wi-fi--tailscale)
@@ -109,22 +144,8 @@ Open <http://127.0.0.1:8765> (or double-click the Windows tray icon). Under **Pa
 resize widgets, then **Save**. Use **Live preview** to see unsaved edits with live data.
 Swipe, tap the page dots or use the phone's volume keys to move between pages.
 
-<details>
-<summary><b>Other installation methods</b></summary>
-
-- **Manual download:** unzip the agent for your system from the [release page](https://github.com/ersinkoc/phonebox/releases/latest)
-  and run it. Install the APK on the phone. Checksums and build provenance accompany the release assets.
-- **Scoop (Windows):**
-
-  ```powershell
-  scoop bucket add phonebox https://github.com/ersinkoc/phonebox
-  scoop install main/adb phonebox/phonebox
-  ```
-
-- **From source:** see the [installation guide](docs/SETUP.md#other-ways-to-install) and [development guide](docs/DEVELOPMENT.md).
-- **winget:** manifests are prepared in [packaging/winget](packaging/winget); see the installation guide for details.
-
-</details>
+More on building and installing from source: [installation guide](docs/SETUP.md#other-ways-to-install) and
+[development guide](docs/DEVELOPMENT.md).
 
 ## Pages & templates
 
@@ -178,7 +199,8 @@ Optional Wi-Fi uses HTTPS on port 8766 with a pinned certificate and a paired ke
 stay local. The phone requests configured actions by ID; commands and integration credentials stay on the computer.
 
 PhoneBox has no telemetry, analytics or accounts of its own. Optional widgets and integrations contact external
-services for weather, quotas, GitHub and other data, and the agent checks GitHub for updates.
+services for weather, quotas, GitHub and other data, and the agent checks GitHub for new releases of the original
+PhoneBox. The video stream stays between the computer and the phone.
 Supported public feeds can fall back through the agent over USB when the phone has no internet.
 The [privacy policy](PRIVACY.md) lists outbound connections and how to disable them.
 Read the [security details](docs/GUIDE.md#security--privacy). To report a vulnerability, follow [SECURITY.md](SECURITY.md).
@@ -196,54 +218,9 @@ python tools/demo-server.py
 
 Open <http://127.0.0.1:8790/panel/> or <http://127.0.0.1:8790/settings/>.
 See [development commands](docs/DEVELOPMENT.md#development) for running the agent, building the APK and testing changes.
-Contributions are welcome; start with [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Code signing policy
-
-Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by
-[SignPath Foundation](https://signpath.org/).
-
-- **Windows agent:** the SignPath Foundation application is pending; releases are unsigned until approved.
-  The intended signing target is `PhoneBoxAgent.exe` in the `win-x64` release zip, built by the
-  [release workflow](.github/workflows/release.yml). Every signing request requires manual approval.
-  Bundled runtime and library notices are in [THIRD-PARTY-NOTICES.txt](agent/PhoneBox.Agent/THIRD-PARTY-NOTICES.txt).
-- **Android app:** release APKs use the project's own signing key, independently of SignPath.
-- **Team roles:** committer, reviewer and signing approver: [ersinkoc](https://github.com/ersinkoc).
-  Pull requests from other contributors are reviewed before merging.
-- **Privacy:** see the [privacy policy](PRIVACY.md).
-
-## Thanks
-
-People who tested PhoneBox on their own hardware:
-
-- [anandyakshit](https://github.com/anandyakshit): Android 7 support, on an Android 7.1.1 phone ([#73](https://github.com/ersinkoc/phonebox/issues/73)).
-
-## Sponsor
-
-<!-- sponsor: WrongStack -->
-<p align="center">
-  <a href="https://wrongstack.com">
-    <img src="docs/sponsors/wrongstack.svg" width="900" alt="Sponsored by WrongStack — open-source AI coding with durable memory and multi-agent workflows. Explore wrongstack.com.">
-  </a>
-</p>
-<p align="center">
-  <strong>Supported by <a href="https://wrongstack.com">WrongStack</a></strong> ·
-  An open-source AI coding agent that remembers your codebase.<br>
-  <a href="https://wrongstack.com"><strong>Explore WrongStack →</strong></a> ·
-  <a href="https://github.com/wrongstack/wrongstack"><strong>View on GitHub &amp; give it a star ★</strong></a>
-</p>
-<!-- /sponsor: WrongStack -->
-
-## Star History
-
-<a href="https://www.star-history.com/#ersinkoc/phonebox&Date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=ersinkoc/phonebox&type=Date&theme=dark">
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=ersinkoc/phonebox&type=Date">
-    <img alt="Star history of ersinkoc/phonebox" src="https://api.star-history.com/svg?repos=ersinkoc/phonebox&type=Date">
-  </picture>
-</a>
+Bundled runtime and library notices are in [THIRD-PARTY-NOTICES.txt](agent/PhoneBox.Agent/THIRD-PARTY-NOTICES.txt).
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). PhoneBox was created by Ersin Koç; the additions in this repository are mine. The original copyright
+notice in [LICENSE](LICENSE) is kept, as the MIT license requires.
