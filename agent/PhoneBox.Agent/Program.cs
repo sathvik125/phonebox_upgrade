@@ -78,6 +78,7 @@ AddMonitor<SessionMonitor>(builder.Services);
 AddMonitor<FeedMonitor>(builder.Services);
 builder.Services.AddSingleton<PhotoFrame>();
 builder.Services.AddSingleton<CameraFeeds>();
+builder.Services.AddSingleton<ScreenFeed>();
 AddMonitor<GitHubMonitor>(builder.Services);
 AddMonitor<PingMonitor>(builder.Services);
 AddMonitor<AdbReverse>(builder.Services);
@@ -225,6 +226,9 @@ app.Use(async (ctx, next) =>
 });
 
 app.Map("/api/trackpad", TrackpadHandler.HandleEndpoint);
+
+// Now playing widget: the live video of the playing app's window, while the phone shows it full screen (ScreenFeed.cs)
+app.MapGet("/api/screen", (HttpContext ctx, ScreenFeed screen) => screen.Stream(ctx));
 
 // ---------------------------------------------------------------- Wi-Fi pairing (local / USB only)
 // The phone calls this through the USB tunnel and stores everything it needs to connect over Wi-Fi.

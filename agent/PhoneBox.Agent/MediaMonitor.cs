@@ -14,6 +14,9 @@ public sealed class MediaMonitor(ILogger<MediaMonitor> log) : BackgroundService
 
     public AlbumArt? Art => _art.Current;
     public MediaSnapshot? Snapshot() => _snap;
+    /// <summary>The playing app as Windows names it (an AppUserModelID or an exe name): ScreenFeed finds its window by it.</summary>
+    public string? SourceAppId => _appId;
+    private volatile string? _appId;
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
@@ -68,7 +71,8 @@ public sealed class MediaMonitor(ILogger<MediaMonitor> log) : BackgroundService
     {
         var s = _mgr!.GetCurrentSession();
         Observe(s);
-        if (s is null) { _snap = null; _art.Clear(); return; }
+        if (s is null) { _snap = null; _appId = null; _art.Clear(); return; }
+        _appId = s.SourceAppUserModelId;
         var revision = Interlocked.Read(ref _revision);
 
         var props = await s.TryGetMediaPropertiesAsync();

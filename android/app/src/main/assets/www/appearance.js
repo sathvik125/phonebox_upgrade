@@ -36,7 +36,8 @@
     if (typeof document === 'undefined' || !document.styleSheets) return;
     for (const sheet of document.styleSheets) {
       if (scaledSheets.has(sheet)) continue;
-      const href = sheet.href || '';
+      // cq-compat.js swaps the links for <style data-href> copies on WebViews without container queries
+      const href = sheet.href || (sheet.ownerNode && sheet.ownerNode.getAttribute && sheet.ownerNode.getAttribute('data-href')) || '';
       if (!/\/(?:style|controls)\.css(?:[?#]|$)/i.test(href)) continue;
       try {
         scaleRuleList(sheet.cssRules);

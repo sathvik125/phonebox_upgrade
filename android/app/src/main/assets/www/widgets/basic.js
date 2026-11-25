@@ -1,6 +1,7 @@
 import { $, API, D, LEVEL_COLOR, LOCALE, mediaHtml, METRICS, PANEL_HEADERS, PREVIEW, Q_STYLE, S_ORDER, ago, api, averageColor, buildLayout, buzz, cfg, cfgVersion, chart, color, cssVar, currentProcessesSort, emit, fillIcon, fmtClock, fmtDur, fmtHM, fmtMem, fmtReset, fmtTime, fmtValue, gotoProcesses, gpuMem, gpusOf, h, en, haptic, hasProcessesPage, hist, hour12, icon, keyButton, levelOf, media, metricText, online, openSheet, paceInfo, pad, prRow, pushView, quotaProviders, r1, registerProcessesSorter, renderStatus, ringSvg, setArtColor, configMark, configReadSince, localWriteStored, setMediaState, setVolDragging, shortDur, shortGpu, store, t, tick, toast, volDragging, wxBlock, wxDeg, wxIcon } from '../main.js';
 import { W } from '../registry.js';
 import { invalidateDeckState } from './controls.js';
+import { openScreenView } from './screen.js';
 
 function bindProcessLink(box, sortTarget) {
   if (!hasProcessesPage()) return;
@@ -100,9 +101,18 @@ W.forecast = {
 
 W.media = {
   needs: ['state', 'fast'],
-  create(box) {
+  create(box, { o = {}, page, w } = {}) {
     box.innerHTML = mediaHtml();
     const q = (s) => box.querySelector(s);
+    // "Show the video when tapped": the cover and titles open the playing window full screen (widgets/screen.js)
+    if (o.video && page && w) {
+      box.classList.add('has-video');
+      q('.m-top').addEventListener('click', () => {
+        if (!D.state?.media) return; // nothing plays: nothing to show
+        haptic();
+        openScreenView(`${page.id}/${w.id}`);
+      });
+    }
     const img = q('.art'), vol = q('.volr');
     const sourceIcon = q('.m-source-icon');
     const sourceIcons = {

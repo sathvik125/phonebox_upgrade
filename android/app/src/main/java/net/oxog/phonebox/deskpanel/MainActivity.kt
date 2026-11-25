@@ -56,6 +56,7 @@ class MainActivity : Activity(), SensorEventListener {
     private val dictation by lazy { Dictation(this) { script -> if (!destroyed) web.evaluateJavascript(script, null) } }
     private lateinit var link: AgentLink
     private lateinit var stream: AgentStream
+    private lateinit var screen: ScreenStream
     @Volatile private var resumed = false
     @Volatile private var volumeKeysFlipPages = true
     private val sensors by lazy { getSystemService(Context.SENSOR_SERVICE) as SensorManager? }
@@ -76,6 +77,10 @@ class MainActivity : Activity(), SensorEventListener {
         link = AgentLink(this)
         stream = AgentStream(link) { event, data ->
             val js = "window.onAgentStream && window.onAgentStream(${JSONObject.quote(event)}, ${JSONObject.quote(data)})"
+            runOnUiThread { if (!destroyed) web.evaluateJavascript(js, null) }
+        }
+        screen = ScreenStream(link) { type, data ->
+            val js = "window.onScreenStream && window.onScreenStream($type, ${JSONObject.quote(data)})"
             runOnUiThread { if (!destroyed) web.evaluateJavascript(js, null) }
         }
 
@@ -249,6 +254,7 @@ class MainActivity : Activity(), SensorEventListener {
         dictation.cancel(0) // the microphone is never left open behind another app or a dark screen
         sensors?.unregisterListener(this)
         stream.stop()
+        screen.stop() // the computer stops capturing as soon as the panel is out of sight
         web.onPause()
         super.onPause()
     }
@@ -259,6 +265,7 @@ class MainActivity : Activity(), SensorEventListener {
         dictation.cancel(0)
         sensors?.unregisterListener(this)
         stream.stop()
+        screen.stop()
         link.trackpadSocket.close()
         link.close()
         (web.parent as? ViewGroup)?.removeView(web) // a WebView must be detached before destroy()
@@ -311,6 +318,19 @@ class MainActivity : Activity(), SensorEventListener {
         private fun ok(key: String) = key == bridgeKey
 
         private val validTrackpadTypes = setOf("move", "click", "rightClick", "mousedown", "mouseup", "scroll", "hscroll")
+
+        /** Now playing's full-screen video: the frames come to window.onScreenStream (see ScreenStream). */
+        @JavascriptInterface
+        fun screenStart(key: String, widget: String, width: Int, height: Int, quality: Int) {
+            if (!ok(key) || widget.length > 200) return
+            screen.start(widget, width.coerceIn(0, 8192), height.coerceIn(0, 8192), quality.coerceIn(1, 3))
+        }
+
+        @JavascriptInterface
+        fun screenStop(key: String) {
+            if (!ok(key)) return
+            screen.stop()
+        }
 
         @JavascriptInterface
         fun trackpad(key: String, type: String, dx: Float, dy: Float, delta: Float) {

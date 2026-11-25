@@ -51,10 +51,11 @@ page lists what reviews keep asking for; following it gets a pull request merged
   it. Outside the app (no native bridge) it must show an empty state, not throw.
 - **The Android app** targets Android 5.0 (API 21) and later and runs the panel in the system WebView, which is
   updated through the Play Store, so its version doesn't follow the Android version. The panel runs from Chromium 83
-  (`compat.js` fills in the newer DOM APIs) and scales widgets fully from Chrome 105 (container query units); below
-  that, `index.html` shows an update notice from a plain script that runs even when the panel's modules don't. The
-  last WebView for Android 6 is 106, so widgets scale fully on Android 6; for Android 5 it is 95, so widgets there don't
-  scale as well. Calls above API 21 need a version check (`./gradlew lintRelease` reports them as NewApi). Changing `minSdk` needs `./gradlew lintDebug` to pass and a note on the devices
+  (`compat.js` fills in the newer DOM APIs). Widgets scale with container query units and `@container` rules, which
+  Chrome has from 105; below that, `cq-compat.js` rewrites the panel's stylesheets to CSS variables it sets from each
+  container's size (try it in any browser with `?cqcompat`). It handles `(min|max)-(width|height)` queries in px
+  only, so keep new `@container` rules to those. `index.html` shows an update notice from a plain script that runs
+  even when the panel's modules don't. Calls above API 21 need a version check (`./gradlew lintRelease` reports them as NewApi). Changing `minSdk` needs `./gradlew lintDebug` to pass and a note on the devices
   and WebView versions you tried.
 - **Don't change behaviour users rely on** (removing a choice, renaming a setting, changing a default) without
   migrating existing settings and saying so in the pull request.
